@@ -1,0 +1,13 @@
+# Ignore virtual environment
+venv/
+__pycache__/
+
+# Ignore configuration (keep it private/local)
+luxwatch_config.json
+
+# Ignore generated icons (installer creates these)
+*.svg
+*.png
+
+# Ignore system files
+.DS_Store
