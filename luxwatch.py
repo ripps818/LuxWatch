@@ -13,7 +13,7 @@ from PyQt6.QtCore import QTimer, Qt
 
 # --- Constants ---
 APP_NAME = "LuxWatch"
-APP_VERSION = "1.3"
+APP_VERSION = "1.4"
 CONFIG_VERSION = 1
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.expanduser("~/.config/luxwatch_config.json")
@@ -23,11 +23,11 @@ ICON_INACTIVE = os.path.join(BASE_DIR, "tray_inactive.svg")
 # Wrappers that we allow deep scanning for
 SAFE_WRAPPERS = [
     "bwrap", "flatpak", "distrobox", "distrobox-enter",
-    "pressure-vessel-adverb", "steam", "python", "python3", "sh", "bash"
+    "pressure-vessel-adverb", "steam", "python", "python3", "sh", "bash",
+    "gamescope", "mangoapp", "mangohud" # Added gamescope as it wraps other apps too
 ]
 
 # Paths that frequently appear in bwrap args but are NOT the app itself
-# (e.g. Vulkan layers mounted from the runtime)
 IGNORE_PREFIXES = [
     "/var/lib/flatpak",
     "/usr/lib/extensions",
@@ -234,8 +234,8 @@ class LuxWatch(QSystemTrayIcon):
         if self.debug: print(".", end="", flush=True)
 
         try:
-            # Get commands and args
-            out_comm = subprocess.check_output(["ps", "-A", "-o", "comm="]).decode("utf-8").splitlines()
+            # Atomic Call: Get ONLY args (full command line) for all processes
+            # This avoids the race condition of calling 'comm' then 'args'
             out_args = subprocess.check_output(["ps", "-A", "-o", "args="]).decode("utf-8").splitlines()
 
             found_profile = None
@@ -245,37 +245,38 @@ class LuxWatch(QSystemTrayIcon):
                 for trigger in profile["triggers"]:
                     trigger_lower = trigger.lower()
 
-                    for cmd, full_args in zip(out_comm, out_args):
-                        cmd = cmd.strip().lower()
-                        full_args = full_args.strip().lower()
+                    for full_args in out_args:
+                        full_args = full_args.strip()
+                        if not full_args: continue
 
-                        # 1. Direct Process Match
-                        if trigger_lower == cmd:
+                        # Split into tokens (e.g. ['/usr/bin/python', 'myscript.py'])
+                        tokens = full_args.split()
+                        if not tokens: continue
+
+                        # 0. Identify the "Main Executable" (First token)
+                        # os.path.basename handles '/usr/bin/gamescope' -> 'gamescope'
+                        exe_name = os.path.basename(tokens[0]).lower()
+
+                        # 1. Direct Match: The executable IS the trigger
+                        if exe_name == trigger_lower:
                             found_profile = profile
-                            trigger_app = cmd
+                            trigger_app = exe_name
                             break
 
-                        # 2. Wrapper Argument Match (The Safe Way)
-                        if cmd in SAFE_WRAPPERS:
-                            # Tokenize the args (split by space)
-                            tokens = full_args.split()
+                        # 2. Wrapper Match: If exe is a wrapper, scan the rest of the tokens
+                        if exe_name in SAFE_WRAPPERS:
+                            # Scan remaining tokens (arguments)
+                            for token in tokens[1:]:
+                                token_base = os.path.basename(token).lower()
 
-                            for token in tokens:
-                                # Check if the filename part of the token matches the trigger
-                                # e.g. "/usr/bin/gamescope" basename is "gamescope"
-                                if os.path.basename(token) == trigger_lower:
-
-                                    # FILTER: Ignore if this token looks like a Flatpak runtime mount
-                                    # This fixes the false positive where 'gamescope' appears in /var/lib/flatpak paths
+                                if token_base == trigger_lower:
+                                    # FILTER: Ignore known Flatpak noise
                                     if any(token.startswith(prefix) for prefix in IGNORE_PREFIXES):
                                         continue
 
-                                    # Match found!
                                     found_profile = profile
-                                    # Create a readable label
                                     trigger_app = (full_args[:40] + '...') if len(full_args) > 40 else full_args
                                     break
-
                             if found_profile: break
 
                     if found_profile: break
