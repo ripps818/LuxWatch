@@ -36,3 +36,5 @@ It is designed for gaming setups where you want your main monitor to be 100% bri
 
 ## License
 MIT
+
+**Note:** This application was mostly **vibecoded**. It works on my machine, and it should work on yours, but it was built with intuition and grit rather than strict enterprise specifications. Use at your own risk (and enjoyment).
