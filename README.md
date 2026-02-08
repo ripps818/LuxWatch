@@ -1,3 +1,5 @@
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/M4M81TUBKF)
+
 # LuxWatch
 
 **LuxWatch** is a lightweight, system-tray utility for Linux (KDE Plasma 6 / Wayland) that automatically manages monitor brightness based on the running application.
